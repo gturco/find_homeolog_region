@@ -82,7 +82,7 @@ def create_region_table(bed_table_name , syn_map1, cursor):
                        FROM (SELECT DISTINCT merge_genes.sfeat , merge_genes.left_gene , \
                        %(syn_map1)s.qfeat as left_gene_qfeat FROM merge_genes, %(syn_map1)s WHERE merge_genes.left_gene \
                         = %(syn_map1)s.sfeat) as left_genes , %(bed_table_name)s \
-                        WHERE left_genes.qfeat = %(bed_table_name)s.accn)" %params
+                        WHERE left_genes.left_gene_qfeat = %(bed_table_name)s.accn)" %params
     cursor.execute(left_region_new)
     # 
     # right_region = "CREATE TABLE IF NOT EXISTS right_region AS \
@@ -96,7 +96,7 @@ def create_region_table(bed_table_name , syn_map1, cursor):
                       FROM (SELECT DISTINCT merge_genes.sfeat , merge_genes.right_gene , %(syn_map1)s.qfeat as right_gene_qfeat\
                       FROM merge_genes, %(syn_map1)s \
                       WHERE merge_genes.right_gene = %(syn_map1)s.sfeat) as right_genes , %(bed_table_name)s \
-                      WHERE right_genes.qfeat = %(bed_table_name)s.accn)" %params
+                      WHERE right_genes.right_gene_qfeat = %(bed_table_name)s.accn)" %params
                       
     cursor.execute(right_region_new)
                       
@@ -176,15 +176,15 @@ def create_mysql_tables(table_name, bed_table_name, dagfile, bed, cursor):
 def main(syn_map1, syn_map2, bed_table_name, dagfile, dagfile2, bed, db_name):
     """main call for importing into mysql"""
     cursor = connect_mysql(db_name)
-    create_mysql_tables(syn_map1, bed_table_name, dagfile, bed, cursor)
-    create_mysql_tables(syn_map2, bed_table_name, dagfile2, bed, cursor)
-    remove_retined_homologs(syn_map1, syn_map2, bed_table_name, cursor)
-    print("Removed retined homologs")
-    grab_genes_to_left(syn_map1, bed_table_name, cursor)
-    print("Removed retined homologs")
-    grab_genes_to_right(syn_map1, bed_table_name, cursor)
-    print("Removed retined homologs")
-    merge_left_right_gene_tables(syn_map1, bed_table_name, cursor)
+    # create_mysql_tables(syn_map1, bed_table_name, dagfile, bed, cursor)
+    # create_mysql_tables(syn_map2, bed_table_name, dagfile2, bed, cursor)
+    # remove_retined_homologs(syn_map1, syn_map2, bed_table_name, cursor)
+    # print("Removed retined homologs")
+    # grab_genes_to_left(syn_map1, bed_table_name, cursor)
+    # print("Removed retined homologs")
+    # grab_genes_to_right(syn_map1, bed_table_name, cursor)
+    # print("Removed retined homologs")
+    # merge_left_right_gene_tables(syn_map1, bed_table_name, cursor)
     create_region_table(bed_table_name, syn_map1, cursor)
     # print("Removed retined homologs")
     happy_happy_joy_joy(cursor)

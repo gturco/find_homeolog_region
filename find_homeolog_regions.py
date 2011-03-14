@@ -147,54 +147,59 @@ def remove_garbage(cursor):
 def create_final_table(org1_org2, cursor):
     """creates the final table outline, then inserts regions under 100000 bps from both the opp and same strand """
     
-    create_table = "CREATE TABLE IF NOT EXISTS FINAL (accn INTEGER , sfeat Varchar(1000), sleft_gene Varchar(1000),\
-                    sright_gene Varchar(1000), sstart INTEGER , send INTEGER, sdiff INTEGER, qleft_gene Varchar(1000), qright_gene Varchar(1000), \
-                    start INTEGER, end INTEGER, diff INTEGER, seqid Varchar(10), strand Varchar(100), url Varchar(10000))"
-    cursor.execute(create_table)
-    
-    small_regions_same ="INSERT INTO FINAL (accn , sfeat, sleft_gene, sright_gene ,qleft_gene, qright_gene , start , end , diff, seqid, strand) \
-                        SELECT postive_diff.accn, postive_diff.sfeat, postive_diff.left_gene, postive_diff.right_gene, \
-                        postive_diff.left_gene_qfeat, postive_diff.right_gene_qfeat, postive_diff.start, postive_diff.end, postive_diff.diff, \
-                       postive_diff.seqid, 'same' FROM postive_diff WHERE postive_diff.diff < 100000"
-    cursor.execute(small_regions_same)
-    # code for putting in negtive regions to final
-    # small_regions_opp = "INSERT INTO FINAL (accn , sfeat, sleft_gene, sright_gene , qleft_gene, qright_gene , start , end , diff, seqid, orientation) \
-    #                     SELECT opp_strand.accn, opp_strand.sfeat, opp_strand.left_gene, opp_strand.right_gene, \
-    #                     opp_strand.left_gene_qfeat ,opp_strand.right_gene_qfeat, opp_strand.start, opp_strand.end, opp_strand.diff, \
-    #                      opp_strand.seqid, 'opp' FROM opp_strand WHERE opp_strand.diff < 100000"
-    # cursor.execute(small_regions_opp)
-    
-    sgenes_info = "UPDATE FINAL, merge_genes SET FINAL.sdiff = merge_genes.sdiff, sstart = merge_genes.left_end , send =  merge_genes.right_start \
-                   WHERE merge_genes.sfeat = FINAL.sfeat"
-    cursor.execute(sgenes_info)
-    
-    url('FINAL', org1_org2, cursor)
+    # create_table = "CREATE TABLE IF NOT EXISTS FINAL (accn INTEGER , sfeat Varchar(1000), sleft_gene Varchar(1000),\
+    #                 sright_gene Varchar(1000), sstart INTEGER , send INTEGER, sdiff INTEGER, qleft_gene Varchar(1000), qright_gene Varchar(1000), \
+    #                 start INTEGER, end INTEGER, diff INTEGER, seqid Varchar(10), strand Varchar(100), url Varchar(10000))"
+    # cursor.execute(create_table)
+    # 
+    # small_regions_pos ="INSERT INTO FINAL (accn , sfeat, sleft_gene, sright_gene ,qleft_gene, qright_gene , start , end , diff, seqid) \
+    #                     SELECT postive_diff.accn, postive_diff.sfeat, postive_diff.left_gene, postive_diff.right_gene, \
+    #                     postive_diff.left_gene_qfeat, postive_diff.right_gene_qfeat, postive_diff.start, postive_diff.end, postive_diff.diff, \
+    #                     postive_diff.seqid FROM postive_diff WHERE postive_diff.diff < 100000"
+    # cursor.execute(small_regions_pos)
+    # # code for putting in negtive regions to final
+    # # small_regions_opp = "INSERT INTO FINAL (accn , sfeat, sleft_gene, sright_gene , qleft_gene, qright_gene , start , end , diff, seqid, orientation) \
+    # #                     SELECT opp_strand.accn, opp_strand.sfeat, opp_strand.left_gene, opp_strand.right_gene, \
+    # #                     opp_strand.left_gene_qfeat ,opp_strand.right_gene_qfeat, opp_strand.start, opp_strand.end, opp_strand.diff, \
+    # #                      opp_strand.seqid, 'opp' FROM opp_strand WHERE opp_strand.diff < 100000"
+    # # cursor.execute(small_regions_opp)
+    # 
+    # sgenes_info = "UPDATE FINAL, merge_genes SET FINAL.sdiff = merge_genes.sdiff, sstart = merge_genes.left_end , send =  merge_genes.right_start \
+    #                WHERE merge_genes.sfeat = FINAL.sfeat"
+    # cursor.execute(sgenes_info)
+    # 
+    # url('FINAL', org1_org2, cursor)
+    cursor.execute("SELECT * FROM  left_genes")
+    left_genes = cursor.fetchall()
+    for left_gene in left_genes:
+        print left_gene
+        assign_strand(left_gene, cursor)
 
 def url(tablename, syn_map2, cursor, base ="http://synteny.cnr.berkeley.edu/CoGe/GEvo.pl?"):
     "creates url for each sfeat, matching the homelogous regions and inserts into mysql"
     cursor.execute("SELECT * FROM  %s " %tablename)
     region_dict = cursor.fetchall()
     for d in region_dict:
-        if d['orientation'] == 'same':
-            sfeat = d['sfeat']
-            accn1 = d['qleft_gene'] 
-            d['diff'] += 10000
-            accn2 = d['sleft_gene'] 
-            d['sdiff'] += 10000
-            d['qfeat'] = grab_qfeat(sfeat, syn_map2, cursor)
-            url = "drup1=1000&drdown1=%(diff)s&drup2=1000&drdown2=%(sdiff)s;accn1=%(qleft_gene)s;accn2=%(sleft_gene)s;accn3=%(qfeat)s;dr3up=10000;dr3down=10000;num_seqs=3"
-            d['url'] = base + url % d
-            import_url_to_mysql(tablename , d['url'], sfeat, cursor)
-        elif d['orientation'] == 'opp': 
-            sfeat = d['sfeat']
-            accn1 = d['qleft_gene'] 
-            d['diff'] += 10000
-            accn2 = d['sleft_gene'] 
-            d['sdiff'] += 10000
-            d['qfeat'] = grab_qfeat(sfeat, syn_map2, cursor)
-            url = "drup1=%(diff)s&drdown1=1000&drup2=1000&drdown2=%(sdiff)s;accn1=%(qleft_gene)s;accn2=%(sleft_gene)s;accn3=%(qfeat)s;dr3up=10000;dr3down=10000;num_seqs=3"
-            d['url'] = base + url % d
-            import_url_to_mysql(tablename , d['url'], sfeat, cursor)
+        # if d['orientation'] == 'same':
+        sfeat = d['sfeat']
+        accn1 = d['qleft_gene'] 
+        d['diff'] += 10000
+        accn2 = d['sleft_gene'] 
+        d['sdiff'] += 10000
+        d['qfeat'] = grab_qfeat(sfeat, syn_map2, cursor)
+        url = "drup1=1000&drdown1=%(diff)s&drup2=1000&drdown2=%(sdiff)s;accn1=%(qleft_gene)s;accn2=%(sleft_gene)s;accn3=%(qfeat)s;dr3up=10000;dr3down=10000;num_seqs=3"
+        d['url'] = base + url % d
+        import_url_to_mysql(tablename , d['url'], sfeat, cursor)
+        # elif d['orientation'] == 'opp': 
+        #     sfeat = d['sfeat']
+        #     accn1 = d['qleft_gene'] 
+        #     d['diff'] += 10000
+        #     accn2 = d['sleft_gene'] 
+        #     d['sdiff'] += 10000
+        #     d['qfeat'] = grab_qfeat(sfeat, syn_map2, cursor)
+        #     url = "drup1=%(diff)s&drdown1=1000&drup2=1000&drdown2=%(sdiff)s;accn1=%(qleft_gene)s;accn2=%(sleft_gene)s;accn3=%(qfeat)s;dr3up=10000;dr3down=10000;num_seqs=3"
+        #     d['url'] = base + url % d
+        #     import_url_to_mysql(tablename , d['url'], sfeat, cursor)
 
 def grab_qfeat(accn, syn_map2, cursor):
     "grabs the sorg qfeat for the third panell"
@@ -213,6 +218,27 @@ def import_url_to_mysql(tablename, url, sfeat, cursor):
     print stmt
     cursor.execute(stmt)
 
+def assign_strand(left_gene, cursor):
+    "assigns a strand to the regions based on the sfeat and left_gene orienations \
+    the dictionary uses numbers based on column number"
+    stmt =   "SELECT  non_retained.* FROM non_retained\
+             WHERE '%s' = non_retained.accn" %left_gene['sfeat']
+    cursor.execute(stmt)
+    print stmt
+    sfeat = cursor.fetchone()
+    if left_gene['strand'] == sfeat['Strand']:
+        update_strand(sfeat['Strand'], sfeat, left_gene, cursor)
+    else:
+        if left_gene['strand'] == '+':
+            update_strand('-', sfeat, left_gene, cursor)
+        else:
+            update_strand('+', sfeat, left_gene, cursor)
+
+def update_strand(sign, sfeat, left_gene, cursor):
+    stmt = "UPDATE FINAL SET FINAL.strand = '{0}'\
+                   WHERE FINAL.sfeat = '{1}' AND FINAL.sleft_gene = '{2}' ".format(sign, sfeat['accn'], left_gene['accn'])
+    cursor.execute(stmt)
+
 
 def main(db_name, org1_org1, org1_org1_path, org1_org2, org1_org2_path, bed_path):
     """runs main function"""
@@ -220,23 +246,23 @@ def main(db_name, org1_org1, org1_org1_path, org1_org2, org1_org2_path, bed_path
     db=MySQLdb.connect(host="127.0.0.1", user="root", db= db_name)
     cursor = db.cursor(cursorclass=MySQLdb.cursors.DictCursor)
     
-    synmap1 = mysql_syn_import(db_name, org1_org1)
-    synmap1.org1_org1(org1_org1_path)
-    synmap1.import_bed_to_mysql(bed_path , org1_org1_path)
-    synmap2 = mysql_syn_import(db_name, org1_org2)
-    synmap2.org1_org2(org1_org2_path)
-    synmap2.import_bed_to_mysql(bed_path , org1_org2_path)
-    create_left_right_tables('right_genes', cursor)
-    create_left_right_tables('left_genes', cursor)
-    org1_org2_bed_table = '%s_bed' %org1_org2 
+    # synmap1 = mysql_syn_import(db_name, org1_org1)
+    # synmap1.org1_org1(org1_org1_path)
+    # synmap1.import_bed_to_mysql(bed_path , org1_org1_path)
+    # synmap2 = mysql_syn_import(db_name, org1_org2)
+    # synmap2.org1_org2(org1_org2_path)
+    # synmap2.import_bed_to_mysql(bed_path , org1_org2_path)
+    # create_left_right_tables('right_genes', cursor)
+    # create_left_right_tables('left_genes', cursor)
+    # org1_org2_bed_table = '%s_bed' %org1_org2 
     org1_org1_bed_table = '%s_bed' %org1_org1
-    remove_retined_homologs(org1_org1_bed_table, org1_org2_bed_table, cursor)
-    find_left_right_gene(org1_org1, org1_org1_bed_table, cursor)
-    create_region_table(org1_org1_bed_table , org1_org1, cursor)
-    remove_garbage(cursor)
+    # remove_retined_homologs(org1_org1_bed_table, org1_org2_bed_table, cursor)
+    # find_left_right_gene(org1_org1_bed_table, cursor)
+    # create_region_table(org1_org1_bed_table , org1_org1, cursor)
+    # remove_garbage(cursor)
     create_final_table(org1_org2, cursor)
 
 
     
 
-main('find_homeo_1', 'rice_rice', '/Users/gturco/results/data/rice_v6_rice_v6.pairs.txt', 'rice_sorg', '/Users/gturco/results/data/rice_v6_sorghum_v1.pairs.txt', '/Users/gturco/results/data/rice_v6.bed')
+main('find_homeo_2', 'rice_rice', '/Users/gturco/results/data/rice_v6_rice_v6.pairs.txt', 'rice_sorg', '/Users/gturco/results/data/rice_v6_sorghum_v1.pairs.txt', '/Users/gturco/results/data/rice_v6.bed')

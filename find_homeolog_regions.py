@@ -4,7 +4,9 @@ from flatfeature import Bed
 import MySQLdb.cursors
 
 def remove_retined_homologs(org1_org1_bed_table, org1_org2_bed_table, cursor): 
-    "Creates a new table containg only genes that are not retained between both speices"   
+    "Creates a new table containg only genes that are not retained between both speices \
+    input:  the bed tables for all specices\
+    otuput: the genes from the bed tables that are not shared"   
     params = {'org1_org1_bed':org1_org1_bed_table, 'org1_org2_bed': org1_org2_bed_table}  
     grab_unique_genes = "CREATE TABLE IF NOT EXISTS non_retained AS \
                          (SELECT %(org1_org2_bed)s.* \
@@ -16,11 +18,16 @@ def remove_retined_homologs(org1_org1_bed_table, org1_org2_bed_table, cursor):
 
 
 def insert_gene(sfeat, gene, table_name , cursor):
+    "inserts bed infromation for the nearest homelog to the left/right into either the left or right table \
+    also inserts the orginal gene of intrest"
     insert_genes = "INSERT INTO %s (sfeat, accn, start, end, chr, strand) \
                       VALUES ('%s','%s',%d, %d,'%s','%s')"  %(table_name, sfeat['accn'], gene['accn'], gene['start'], gene['end'], gene['Chr'], gene['Strand'])
     cursor.execute(insert_genes)
 
 def grab_gene_to_right(sfeat, bed_table, cursor):
+    "grabs the nerest homelog to the right of the gene of intrest (on either strand) \
+    input: gene of intrest, bed table \
+    output: the homelog closet to the right of the gene of intrest (format: gene name and bed table information)"
     sfeat['bed_table'] = bed_table
     # Chr and Strand need to be caps to work 
     right_gene_bed = "SELECT %(bed_table)s.* \
@@ -34,6 +41,9 @@ def grab_gene_to_right(sfeat, bed_table, cursor):
     return right_gene
 
 def grab_gene_to_left(sfeat, bed_table, cursor):
+    "grabs the nerest homelog to the left of the gene of intrest (on either strand) \
+    input: gene of intrest, bed table \
+    output: the homelog closet to the left of the gene of intrest (format: gene name)"
     sfeat['bed_table'] = bed_table
     left_gene_bed = "SELECT %(bed_table)s.* \
                        FROM %(bed_table)s \
@@ -46,6 +56,7 @@ def grab_gene_to_left(sfeat, bed_table, cursor):
     return left_gene
 
 def merge_tables(cursor):
+    "merges the left and right table based on the sfeat"
     merge = "CREATE TABLE merge_genes AS(SELECT DISTINCT left_genes.sfeat, left_genes.accn as left_gene, right_genes.accn as right_gene,\
             left_genes.start as left_start, left_genes.end as left_end, right_genes.start as right_start, \
             right_genes.end as right_end, (right_genes.start - left_genes.end ) as sdiff, right_genes.chr as chr, left_genes.strand as lstrand ,right_genes.strand as rstrand \
@@ -58,10 +69,14 @@ def merge_tables(cursor):
                          ADD PRIMARY KEY(accn)"
     cursor.execute(add_accn_to_table)
 
-def find_left_right_gene(syn_map1, bed_table, cursor):
+def find_left_right_gene (bed_table, cursor):
+    "finds the closet homelog to the left and the right of the gene of intrest \
+    imput: bed information for the non_retained gene of intrest \
+    output: the homelog to the left and right with its bed info"
  #   filter_bed_table(syn_map1 , bed_table_name , cursor)
     select_non_retained_genes = "SELECT * FROM non_retained"
     cursor.execute(select_non_retained_genes)
+    #creates a dictionary for the non_retained_genes table
     non_retained = cursor.fetchall()
     for sfeat in non_retained:
         right_gene = grab_gene_to_right(sfeat, bed_table, cursor)
@@ -77,6 +92,8 @@ def find_left_right_gene(syn_map1, bed_table, cursor):
     merge_tables(cursor)
 
 def create_left_right_tables(name ,cursor):
+    "creates the table that will be used to insert genes to the left and right of the gene of intrest \
+    imput : name of the table,  output: table "
     stmt = "CREATE TABLE IF NOT EXISTS %s (sfeat Varchar(30), accn Varchar(30), \
             start INTEGER, end INTEGER , chr Varchar(30), strand Varchar(30))" % name
     cursor.execute(stmt)
@@ -196,19 +213,19 @@ def main(db_name, org1_org1, org1_org1_path, org1_org2, org1_org2_path, bed_path
     db=MySQLdb.connect(host="127.0.0.1", user="root", db= db_name)
     cursor = db.cursor(cursorclass=MySQLdb.cursors.DictCursor)
     
-    # synmap1 = mysql_syn_import(db_name, org1_org1)
-    # synmap1.org1_org1(org1_org1_path)
-    # synmap1.import_bed_to_mysql(bed_path , org1_org1_path)
-    # synmap2 = mysql_syn_import(db_name, org1_org2)
-    # synmap2.org1_org2(org1_org2_path)
-    # synmap2.import_bed_to_mysql(bed_path , org1_org2_path)
-    #create_left_right_tables('right_genes', cursor)
-    #create_left_right_tables('left_genes', cursor)
+    synmap1 = mysql_syn_import(db_name, org1_org1)
+    synmap1.org1_org1(org1_org1_path)
+    synmap1.import_bed_to_mysql(bed_path , org1_org1_path)
+    synmap2 = mysql_syn_import(db_name, org1_org2)
+    synmap2.org1_org2(org1_org2_path)
+    synmap2.import_bed_to_mysql(bed_path , org1_org2_path)
+    create_left_right_tables('right_genes', cursor)
+    create_left_right_tables('left_genes', cursor)
     org1_org2_bed_table = '%s_bed' %org1_org2 
     org1_org1_bed_table = '%s_bed' %org1_org1
-    # remove_retined_homologs(org1_org1_bed_table, org1_org2_bed_table, cursor)
-    #find_left_right_gene(org1_org1, org1_org1_bed_table, cursor)
-    #create_region_table(org1_org1_bed_table , org1_org1, cursor)
+    remove_retined_homologs(org1_org1_bed_table, org1_org2_bed_table, cursor)
+    find_left_right_gene(org1_org1, org1_org1_bed_table, cursor)
+    create_region_table(org1_org1_bed_table , org1_org1, cursor)
     orintation(cursor)
     create_final_table(org1_org2, cursor)
     

@@ -101,7 +101,9 @@ def create_left_right_tables(name ,cursor):
 
 
 def create_region_table(bed_table_name , syn_map1, cursor):
-    """CHANGE here NEXT grab all qfeats independt of strand then filter for if they both change or both stay the same"""
+    """Creates a table that contains the homelog of the left and right gene along with its bed informations\
+    currently only grabs homelogs that remain on the same strand to make guessing the sfeat strand easier \
+    CHANGE here NEXT grab all qfeats independt of strand then filter for if they both change or both stay the same"""
     params = {'bed_table_name': bed_table_name, 'syn_map1' : syn_map1}
     left_region_new = "CREATE TABLE left_region as(SELECT DISTINCT left_genes.* , %(bed_table_name)s.start , %(bed_table_name)s.end , %(bed_table_name)s.chr, %(bed_table_name)s.strand \
                        FROM (SELECT DISTINCT merge_genes.accn, merge_genes.sfeat , merge_genes.left_gene, merge_genes.lstrand,\
@@ -125,38 +127,42 @@ def create_region_table(bed_table_name , syn_map1, cursor):
     print region
     cursor.execute(region)
 
-def orintation(cursor):
-    same_strand = "CREATE TABLE same_strand as(SELECT Region.accn, Region.sfeat, Region.Right_gene , Region.Right_gene_qfeat,  Region.left_gene, Region.left_gene_qfeat, Region.Lend as start, region.Rstart as end , \
+def remove_garbage(cursor):
+    "finds results where the perdicted region is negtive \
+    due to transpo... deletions ect \
+    imputs: regions size, output: two table one with negtive regions one with postive(shoulnt be neg cause selecting qfeat for same strand)  "
+    
+    pos_diff = "CREATE TABLE postive_diff as(SELECT Region.accn, Region.sfeat, Region.Right_gene , Region.Right_gene_qfeat,  Region.left_gene, Region.left_gene_qfeat, Region.Lend as start, region.Rstart as end , \
                                               (region.Rstart - Region.Lend ) as diff,  Region.seqid  \
                                                FROM Region \
                                                WHERE (region.Rstart > Region.Lend ))"
-    cursor.execute(same_strand)
+    cursor.execute(pos_diff)
     
-    opp_strand = "CREATE TABLE opp_strand as(SELECT Region.accn, Region.sfeat, Region.Right_gene , Region.Right_gene_qfeat, Region.left_gene, Region.left_gene_qfeat, Region.Rend as start, region.Lstart as end , \
+    neg_diff = "CREATE TABLE neg_diff as(SELECT Region.accn, Region.sfeat, Region.Right_gene , Region.Right_gene_qfeat, Region.left_gene, Region.left_gene_qfeat, Region.Rend as start, region.Lstart as end , \
                                             (region.Lend - Region.Rstart) as diff,  Region.seqid \
                                             FROM Region \
                                             WHERE (region.Rstart < Region.Lend ))"
-    cursor.execute(opp_strand)
+    cursor.execute(neg_diff)
 
 def create_final_table(org1_org2, cursor):
-    """creates the final table outline, then inserts regions under 100000 bps from both the opp and same strand"""
+    """creates the final table outline, then inserts regions under 100000 bps from both the opp and same strand """
     
     create_table = "CREATE TABLE IF NOT EXISTS FINAL (accn INTEGER , sfeat Varchar(1000), sleft_gene Varchar(1000),\
                     sright_gene Varchar(1000), sstart INTEGER , send INTEGER, sdiff INTEGER, qleft_gene Varchar(1000), qright_gene Varchar(1000), \
-                    start INTEGER, end INTEGER, diff INTEGER, seqid Varchar(10), orientation Varchar(100), url Varchar(10000))"
+                    start INTEGER, end INTEGER, diff INTEGER, seqid Varchar(10), strand Varchar(100), url Varchar(10000))"
     cursor.execute(create_table)
     
-    small_regions_same ="INSERT INTO FINAL (accn , sfeat, sleft_gene, sright_gene ,qleft_gene, qright_gene , start , end , diff, seqid, orientation) \
-                        SELECT same_strand.accn, same_strand.sfeat, same_strand.left_gene, same_strand.right_gene, \
-                        same_strand.left_gene_qfeat, same_strand.right_gene_qfeat, same_strand.start, same_strand.end, same_strand.diff, \
-                       same_strand.seqid, 'same' FROM same_strand WHERE same_strand.diff < 100000"
+    small_regions_same ="INSERT INTO FINAL (accn , sfeat, sleft_gene, sright_gene ,qleft_gene, qright_gene , start , end , diff, seqid, strand) \
+                        SELECT postive_diff.accn, postive_diff.sfeat, postive_diff.left_gene, postive_diff.right_gene, \
+                        postive_diff.left_gene_qfeat, postive_diff.right_gene_qfeat, postive_diff.start, postive_diff.end, postive_diff.diff, \
+                       postive_diff.seqid, 'same' FROM postive_diff WHERE postive_diff.diff < 100000"
     cursor.execute(small_regions_same)
-    
-    small_regions_opp = "INSERT INTO FINAL (accn , sfeat, sleft_gene, sright_gene , qleft_gene, qright_gene , start , end , diff, seqid, orientation) \
-                        SELECT opp_strand.accn, opp_strand.sfeat, opp_strand.left_gene, opp_strand.right_gene, \
-                        opp_strand.left_gene_qfeat ,opp_strand.right_gene_qfeat, opp_strand.start, opp_strand.end, opp_strand.diff, \
-                         opp_strand.seqid, 'opp' FROM opp_strand WHERE opp_strand.diff < 100000"
-    cursor.execute(small_regions_opp)
+    # code for putting in negtive regions to final
+    # small_regions_opp = "INSERT INTO FINAL (accn , sfeat, sleft_gene, sright_gene , qleft_gene, qright_gene , start , end , diff, seqid, orientation) \
+    #                     SELECT opp_strand.accn, opp_strand.sfeat, opp_strand.left_gene, opp_strand.right_gene, \
+    #                     opp_strand.left_gene_qfeat ,opp_strand.right_gene_qfeat, opp_strand.start, opp_strand.end, opp_strand.diff, \
+    #                      opp_strand.seqid, 'opp' FROM opp_strand WHERE opp_strand.diff < 100000"
+    # cursor.execute(small_regions_opp)
     
     sgenes_info = "UPDATE FINAL, merge_genes SET FINAL.sdiff = merge_genes.sdiff, sstart = merge_genes.left_end , send =  merge_genes.right_start \
                    WHERE merge_genes.sfeat = FINAL.sfeat"
@@ -207,6 +213,7 @@ def import_url_to_mysql(tablename, url, sfeat, cursor):
     print stmt
     cursor.execute(stmt)
 
+
 def main(db_name, org1_org1, org1_org1_path, org1_org2, org1_org2_path, bed_path):
     """runs main function"""
     
@@ -226,9 +233,10 @@ def main(db_name, org1_org1, org1_org1_path, org1_org2, org1_org2_path, bed_path
     remove_retined_homologs(org1_org1_bed_table, org1_org2_bed_table, cursor)
     find_left_right_gene(org1_org1, org1_org1_bed_table, cursor)
     create_region_table(org1_org1_bed_table , org1_org1, cursor)
-    orintation(cursor)
+    remove_garbage(cursor)
     create_final_table(org1_org2, cursor)
-    
+
+
     
 
 main('find_homeo_1', 'rice_rice', '/Users/gturco/results/data/rice_v6_rice_v6.pairs.txt', 'rice_sorg', '/Users/gturco/results/data/rice_v6_sorghum_v1.pairs.txt', '/Users/gturco/results/data/rice_v6.bed')

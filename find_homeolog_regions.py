@@ -144,7 +144,7 @@ def remove_garbage(cursor):
                                             WHERE (region.Rstart < Region.Lend ))"
     cursor.execute(neg_diff)
 
-def create_final_table(org1_org2, cursor):
+def create_final_table(org1_org2, cursor, sdsid, sdsgid, qdsid, qdsgid):
     """creates the final table outline, then inserts regions under 100000 bps from both the opp and same strand """
     
     create_table = "CREATE TABLE IF NOT EXISTS FINAL (accn INTEGER , sfeat Varchar(1000), sleft_gene Varchar(1000),\
@@ -168,14 +168,15 @@ def create_final_table(org1_org2, cursor):
                    WHERE merge_genes.sfeat = FINAL.sfeat"
     cursor.execute(sgenes_info)
     
-    url('FINAL', org1_org2, cursor)
+    url('FINAL', org1_org2, cursor, sdsid, sdsgid, qdsid, qdsgid)
     cursor.execute("SELECT * FROM  left_genes")
     left_genes = cursor.fetchall()
     for left_gene in left_genes:
         print left_gene
         assign_strand(left_gene, cursor)
 
-def url(tablename, syn_map2, cursor, base ="http://synteny.cnr.berkeley.edu/CoGe/GEvo.pl?"):
+def url(tablename, syn_map2, cursor, sdsid, sdsgid, qdsid, qdsgid,
+        base ="http://synteny.cnr.berkeley.edu/CoGe/GEvo.pl?prog=blastn;fh=20;padding=2;nt=1;cbc=0;spike_len=15;skip_feat_overlap=1;skip_hsp_overlap=1;"):
     "creates url for each sfeat, matching the homelogous regions and inserts into mysql"
     cursor.execute("SELECT * FROM  %s " %tablename)
     region_dict = cursor.fetchall()
@@ -187,7 +188,14 @@ def url(tablename, syn_map2, cursor, base ="http://synteny.cnr.berkeley.edu/CoGe
         accn2 = d['sleft_gene'] 
         d['sdiff'] += 15000
         d['qfeat'] = grab_qfeat(sfeat, syn_map2, cursor)
-        url = "drup1=10000&drdown1=%(diff)s&drup2=10000&drdown2=%(sdiff)s;accn1=%(qleft_gene)s;accn2=%(sleft_gene)s;accn3=%(qfeat)s;dr3up=10000;dr3down=10000;num_seqs=3"
+        d['qdsid'] = qdsid  # sorg is q
+        d['sdsid'] = sdsid  # in this case rice is s
+        d['qdsgid'] = qdsid # sorg is q
+        d['sdsgid'] = sdsgid # rice is s
+        url = "accn1=%(qleft_gene)s;dsid1=%(sdsid)s;dsgid1=%(sdsgid)s;drup1=10000;drdown1=%(diff)s;ref1=1;\
+accn2=%(sleft_gene)s;dsid1=%(sdsid)s;dsgid1=%(sdsgid)s;drup2=10000;drdown2=%(sdiff)s;ref2=1;\
+accn3=%(qfeat)s;dsid3=%(qdsid)s;dsgid3=%(qdsgid)s;dr3up=10000;dr3down=10000;ref3=1;\
+num_seqs=3;hsp_overlap_limit=0;hsp_size_limit=0"
         d['url'] = base + url % d
         import_url_to_mysql(tablename , d['url'], sfeat, cursor)
         # elif d['orientation'] == 'opp': 
@@ -239,7 +247,7 @@ def update_strand(sign, sfeat, left_gene, cursor):
     cursor.execute(stmt)
 
 
-def main(db_name, org1_org1, org1_org1_path, org1_org2, org1_org2_path, bed_path):
+def main(db_name, org1_org1, org1_org1_path, org1_org2, org1_org2_path, bed_path, sdsid, sdsgid, qdsid, qdsgid):
     """runs main function"""
     
     db=MySQLdb.connect(host="127.0.0.1", user="root", db= db_name)
@@ -259,9 +267,9 @@ def main(db_name, org1_org1, org1_org1_path, org1_org2, org1_org2_path, bed_path
     find_left_right_gene(org1_org1_bed_table, cursor)
     create_region_table(org1_org1_bed_table , org1_org1, cursor)
     remove_garbage(cursor)
-    create_final_table(org1_org2, cursor)
+    create_final_table(org1_org2, cursor, sdsid, sdsgid, qdsid, qdsgid)
 
 
-    
-
-main('find_homeo_2', 'rice_rice', '/Users/gturco/results/data/rice_v6_rice_v6.pairs.txt', 'rice_sorg', '/Users/gturco/results/data/rice_v6_sorghum_v1.pairs.txt', '/Users/gturco/results/data/rice_v6.bed')
+main('find_homeo_3', 'rice_rice', '/Users/gturco/find_regions_data/input/03_15_11/rice_v6_rice_v6.pairs.txt', 'rice_sorg',
+ '/Users/gturco/results/data/rice_v6_sorghum_v1.pairs.txt', '/Users/gturco/find_regions_data/input/03_15_11/rice_v6.bed',
+ 43388, 9109, 34580, 93)

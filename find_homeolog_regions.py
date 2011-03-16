@@ -172,7 +172,6 @@ def create_final_table(org1_org2, sdsid, sdsgid, qdsid, qdsgid, cursor):
     cursor.execute("SELECT * FROM  left_genes")
     left_genes = cursor.fetchall()
     for left_gene in left_genes:
-        print left_gene
         assign_strand(left_gene, cursor)
 
 def url(tablename, syn_map2, sdsid, sdsgid, qdsid, qdsgid, cursor,
@@ -223,7 +222,6 @@ def grab_qfeat(accn, syn_map2, cursor):
 
 def import_url_to_mysql(tablename, url, sfeat, cursor):
     stmt = "UPDATE {0} SET url = '{1}' WHERE sfeat = '{2}'".format(tablename, url, sfeat)
-    print stmt
     cursor.execute(stmt)
 
 def assign_strand(left_gene, cursor):

@@ -182,9 +182,9 @@ def url(tablename, syn_map2, sdsid, sdsgid, qdsid, qdsgid, cursor,
     for d in region_dict:
         # if d['orientation'] == 'same':
         sfeat = d['sfeat']
-        accn1 = d['qleft_gene'] 
+        qleft = d['qleft_gene'] 
         d['diff'] += 15000
-        accn2 = d['sleft_gene'] 
+        qright = d['qright_gene'] 
         d['sdiff'] += 15000
         d['qfeat'] = grab_qfeat(sfeat, syn_map2, cursor)
         d['qdsid'] = qdsid  # sorg is q
@@ -196,7 +196,7 @@ accn2=%(sleft_gene)s;dsid2=%(sdsid)s;dsgid2=%(sdsgid)s;drup2=10000;drdown2=%(sdi
 accn3=%(qfeat)s;dsid3=%(qdsid)s;dsgid3=%(qdsgid)s;dr3up=10000;dr3down=10000;ref3=1;\
 num_seqs=3;hsp_overlap_limit=0;hsp_size_limit=0"
         d['url'] = base + url % d
-        import_url_to_mysql(tablename , d['url'], sfeat, cursor)
+        import_url_to_mysql(tablename , d['url'], sfeat, d['qleft_gene'] ,  d['qright_gene'] , cursor)
         # elif d['orientation'] == 'opp': 
         #     sfeat = d['sfeat']
         #     accn1 = d['qleft_gene'] 
@@ -220,8 +220,8 @@ def grab_qfeat(accn, syn_map2, cursor):
     qfeat_dict = cursor.fetchone()
     return qfeat_dict['qfeat']
 
-def import_url_to_mysql(tablename, url, sfeat, cursor):
-    stmt = "UPDATE {0} SET url = '{1}' WHERE sfeat = '{2}'".format(tablename, url, sfeat)
+def import_url_to_mysql(tablename, url, sfeat, qleft_gene, qright_gene, cursor):
+    stmt = "UPDATE {0} SET url = '{1}' WHERE sfeat = '{2}' AND qleft_gene = '{3}' AND qright_gene = '{4}'".format(tablename, url, sfeat, qleft_gene, qright_gene)
     cursor.execute(stmt)
 
 def assign_strand(left_gene, cursor):
